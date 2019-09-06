@@ -27,7 +27,7 @@ import (
 
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-
+	"k8s.io/client-go/util/workqueue"
 	// Uncomment the following line to load the gcp plugin (only required to authenticate against GKE clusters).
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 
@@ -90,6 +90,7 @@ func main() {
 		PgtaskClient:    crdClient,
 		PgtaskScheme:    crdScheme,
 		PgtaskClientset: Clientset,
+		Queue:           workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 		Namespace:       Namespace,
 	}
 
@@ -97,12 +98,14 @@ func main() {
 		PgclusterClient:    crdClient,
 		PgclusterScheme:    crdScheme,
 		PgclusterClientset: Clientset,
+		Queue:              workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 		Namespace:          Namespace,
 	}
 	pgReplicacontroller := controller.PgreplicaController{
 		PgreplicaClient:    crdClient,
 		PgreplicaScheme:    crdScheme,
 		PgreplicaClientset: Clientset,
+		Queue:              workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 		Namespace:          Namespace,
 	}
 	pgUpgradecontroller := controller.PgupgradeController{
@@ -115,6 +118,8 @@ func main() {
 		PgbackupClient:    crdClient,
 		PgbackupScheme:    crdScheme,
 		PgbackupClientset: Clientset,
+		Queue:             workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		UpdateQueue:       workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 		Namespace:         Namespace,
 	}
 	pgPolicycontroller := controller.PgpolicyController{
@@ -137,9 +142,14 @@ func main() {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
 	go pgTaskcontroller.Run(ctx)
+	go pgTaskcontroller.RunWorker()
 	go pgClustercontroller.Run(ctx)
+	go pgClustercontroller.RunWorker()
 	go pgReplicacontroller.Run(ctx)
+	go pgReplicacontroller.RunWorker()
 	go pgBackupcontroller.Run(ctx)
+	go pgBackupcontroller.RunWorker()
+	go pgBackupcontroller.RunUpdateWorker()
 	go pgUpgradecontroller.Run(ctx)
 	go pgPolicycontroller.Run(ctx)
 	go podcontroller.Run(ctx)

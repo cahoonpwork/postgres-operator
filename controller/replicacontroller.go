@@ -25,7 +25,11 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	crv1 "github.com/crunchydata/postgres-operator/apis/cr/v1"
+	"github.com/crunchydata/postgres-operator/kubeapi"
+	"github.com/crunchydata/postgres-operator/util"
 	clusteroperator "github.com/crunchydata/postgres-operator/operator/cluster"
+	"k8s.io/client-go/util/workqueue"
+	"strings"
 )
 
 // PgreplicaController holds the connections for the controller
@@ -34,10 +38,14 @@ type PgreplicaController struct {
 	PgreplicaScheme    *runtime.Scheme
 	PgreplicaClientset *kubernetes.Clientset
 	Namespace          string
+	Ctx 			   context.Context
+	Queue 				workqueue.RateLimitingInterface
 }
 
 // Run starts an pgreplica resource controller
 func (c *PgreplicaController) Run(ctx context.Context) error {
+
+	defer c.Queue.ShutDown()
 
 	_, err := c.watchPgreplicas(ctx)
 	if err != nil {
@@ -79,6 +87,75 @@ func (c *PgreplicaController) watchPgreplicas(ctx context.Context) (cache.Contro
 	return controller, nil
 }
 
+func (c *PgreplicaController) RunWorker() {
+
+	//process the 'add' work queue forever
+	for c.processNextItem() {
+	}
+}
+
+func (c *PgreplicaController) processNextItem() bool {
+	// Wait until there is a new item in the working queue
+	key, quit := c.Queue.Get()
+	if quit {
+		return false
+	}
+
+	log.Debugf("working on %s", key.(string))
+	keyParts := strings.Split(key.(string), "/")
+	keyNamespace := keyParts[0]
+	keyResourceName := keyParts[1]
+
+	log.Debugf("pgreplica queue got key ns=[%s] resource=[%s]", keyNamespace, keyResourceName)
+
+	// Tell the queue that we are done with processing this key. This unblocks the key for other workers
+	// This allows safe parallel processing because two pods with the same key are never processed in
+	// parallel.
+	defer c.Queue.Done(key)
+	// Invoke the method containing the business logic
+	// for pgbackups, the convention is the CRD name is always
+	// the same as the pg-cluster label value
+
+	// in this case, the de-dupe logic is to test whether a replica
+	// deployment exists already , if so, then we don't create another
+	// backup job
+	_, found, _ := kubeapi.GetDeployment(c.PgreplicaClientset, keyResourceName, keyNamespace)
+
+	depRunning := false
+	if found {
+		depRunning = true
+	}
+
+	if depRunning {
+		log.Debugf("working...found replica already, would do nothing")
+	} else {
+		log.Debugf("working...no replica found, means we process")
+
+		//handle the case of when a pgreplica is added which is
+		//scaling up a cluster
+		replica := crv1.Pgreplica{}
+		found, err := kubeapi.Getpgreplica(c.PgreplicaClient, &replica, keyResourceName, keyNamespace)
+		if !found {
+			log.Error(err)
+			return false
+		}
+		clusteroperator.ScaleBase(c.PgreplicaClientset, c.PgreplicaClient, &replica, replica.ObjectMeta.Namespace)
+
+		state := crv1.PgreplicaStateProcessed
+		message := "Successfully processed Pgreplica by controller"
+		err = kubeapi.PatchpgreplicaStatus(c.PgreplicaClient, state, message, &replica, replica.ObjectMeta.Namespace)
+		if err != nil {
+			log.Errorf("ERROR updating pgreplica status: %s", err.Error())
+		}
+
+		//no error, tell the queue to stop tracking history
+		c.Queue.Forget(key)
+	}
+	return true
+}
+
+
+
 // onAdd is called when a pgreplica is added
 func (c *PgreplicaController) onAdd(obj interface{}) {
 	replica := obj.(*crv1.Pgreplica)
@@ -91,32 +168,13 @@ func (c *PgreplicaController) onAdd(obj interface{}) {
 		return
 	}
 
-	// NEVER modify objects from the store. It's a read-only, local cache.
-	// You can use clusterScheme.Copy() to make a deep copy of original object and modify this copy
-	// Or create a copy manually for better performance
-	copyObj := replica.DeepCopyObject()
-	replicaCopy := copyObj.(*crv1.Pgreplica)
-
-	replicaCopy.Status = crv1.PgreplicaStatus{
-		State:   crv1.PgreplicaStateProcessed,
-		Message: "Successfully processed Pgreplica by controller",
+	key, err := cache.MetaNamespaceKeyFunc(obj)
+	if err == nil {
+		log.Debugf("onAdd putting key in queue %s", key)
+		c.Queue.Add(key)
+	} else {
+		log.Errorf("replicacontroller: error acquiring key: %s", err.Error())
 	}
-
-	err := c.PgreplicaClient.Put().
-		Name(replica.ObjectMeta.Name).
-		Namespace(replica.ObjectMeta.Namespace).
-		Resource(crv1.PgreplicaResourcePlural).
-		Body(replicaCopy).
-		Do().
-		Error()
-
-	if err != nil {
-		log.Errorf("ERROR updating pgreplica status: %s", err.Error())
-	}
-
-	//handle the case of when a pgreplica is added which is
-	//scaling up a cluster
-	clusteroperator.ScaleBase(c.PgreplicaClientset, c.PgreplicaClient, replicaCopy, replicaCopy.ObjectMeta.Namespace)
 
 }
 
@@ -131,4 +189,18 @@ func (c *PgreplicaController) onUpdate(oldObj, newObj interface{}) {
 func (c *PgreplicaController) onDelete(obj interface{}) {
 	replica := obj.(*crv1.Pgreplica)
 	log.Debugf("[PgreplicaController] OnDelete ns=%s %s", replica.ObjectMeta.Namespace, replica.ObjectMeta.SelfLink)
+
+	//make sure we are not removing a replica deployment
+	//that is now the primary after a failover
+	dep, found, _ := kubeapi.GetDeployment(c.PgreplicaClientset, replica.Spec.Name, replica.ObjectMeta.Namespace)
+	if found {
+		if dep.ObjectMeta.Labels[util.LABEL_SERVICE_NAME] == dep.ObjectMeta.Labels[util.LABEL_PG_CLUSTER] {
+			//the replica was made a primary at some point
+			//we will not scale down the deployment
+			log.Debugf("[PgreplicaController] OnDelete not scaling down the replica since it is acting as a primary")
+		} else {
+			clusteroperator.ScaleDownBase(c.PgreplicaClientset, c.PgreplicaClient, replica, replica.ObjectMeta.Namespace)
+		}
+	}
+
 }
