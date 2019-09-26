@@ -865,6 +865,8 @@ func getClusterParams(request *msgs.CreateClusterRequest, name string, userLabel
 	spec.Name = name
 	spec.ClusterName = name
 	spec.Port = apiserver.Pgo.Cluster.Port
+	spec.PGBadgerPort = apiserver.Pgo.Cluster.PGBadgerPort
+	spec.ExporterPort = apiserver.Pgo.Cluster.ExporterPort
 	spec.SecretFrom = ""
 	spec.PrimaryHost = name
 	if request.Policies == "" {
@@ -874,7 +876,6 @@ func getClusterParams(request *msgs.CreateClusterRequest, name string, userLabel
 		spec.Policies = request.Policies
 	}
 
-	spec.User = "testuser"
 	spec.Database = "userdb"
 	spec.Replicas = "0"
 	str := apiserver.Pgo.Cluster.Replicas
@@ -898,8 +899,8 @@ func getClusterParams(request *msgs.CreateClusterRequest, name string, userLabel
 		spec.Port = str
 	}
 	str = apiserver.Pgo.Cluster.User
-	log.Debugf("Pgo.Cluster.User is %s", apiserver.Pgo.Cluster.User)
 	if str != "" {
+		log.Debugf("Pgo.Cluster.User is %s", str)
 		spec.User = str
 	}
 	str = apiserver.Pgo.Cluster.Database
