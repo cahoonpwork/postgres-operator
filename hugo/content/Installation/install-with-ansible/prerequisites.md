@@ -26,7 +26,7 @@ The following is required prior to installing Crunchy PostgreSQL Operator using 
 
 ## Installing from a Windows Host
 
-If the Crunchy PostgreSQL Operator is being installed from a Windows host the following 
+If the Crunchy PostgreSQL Operator is being installed from a Windows host the following
 are required:
 
 * [Windows Subsystem for Linux (WSL)](https://docs.microsoft.com/en-us/windows/wsl/install-win10)
@@ -35,7 +35,7 @@ are required:
 ## Permissions
 
 The installation of the Crunchy PostgreSQL Operator requires elevated privileges.  
-It is required that the playbooks are run as a `cluster-admin` to ensure the playbooks 
+It is required that the playbooks are run as a `cluster-admin` to ensure the playbooks
 can install:
 
 * Custom Resource Definitions
@@ -52,17 +52,17 @@ There are two ways to obtain the Crunchy PostgreSQL Operator Roles:
 
 ### GitHub Installation
 
-All necessary files (inventory, main playbook and roles) can be found in the `ansible` 
+All necessary files (inventory, main playbook and roles) can be found in the `ansible`
 directory in the  [postgres-operator project](https://github.com/CrunchyData/postgres-operator).
 
 ### RPM Installation using Yum
 
-Available to Crunchy customers is an RPM containing all the necessary Ansible roles 
-and files required for installation using Ansible.  The RPM can be found in Crunchy's 
-yum repository.  For information on setting up `yum` to use the Crunchy repoistory, 
+Available to Crunchy customers is an RPM containing all the necessary Ansible roles
+and files required for installation using Ansible.  The RPM can be found in Crunchy's
+yum repository.  For information on setting up `yum` to use the Crunchy repoistory,
 see the [Crunchy Access Portal](https://access.crunchydata.com/).
 
-To install the Crunchy PostgreSQL Operator Ansible roles using `yum`, run the following 
+To install the Crunchy PostgreSQL Operator Ansible roles using `yum`, run the following
 command on a RHEL or CentOS host:
 
 ```bash
@@ -72,7 +72,7 @@ sudo yum install postgres-operator-playbooks
 * Ansible roles can be found in: `/usr/share/ansible/roles/crunchydata`
 * Ansible playbooks/inventory files can be found in: `/usr/share/ansible/postgres-operator/playbooks`
 
-Once installed users should take a copy of the `inventory` file included in the installation 
+Once installed users should take a copy of the `inventory` file included in the installation
 using the following command:
 
 ```bash
@@ -81,8 +81,8 @@ cp /usr/share/ansible/postgres-operator/playbooks/inventory ${HOME?}
 
 ## Configuring the Inventory File
 
-The `inventory` file included with the PostgreSQL Operator Playbooks allows installers 
-to configure how the operator will function when deployed into Kubernetes.  This file 
+The `inventory` file included with the PostgreSQL Operator Playbooks allows installers
+to configure how the operator will function when deployed into Kubernetes.  This file
 should contain all configurable variables the playbooks offer.
 
 The following are the variables available for configuration:
@@ -136,7 +136,7 @@ The following are the variables available for configuration:
 | `pgo_image_prefix`                | crunchydata | Configures the image prefix used when creating containers for the Crunchy PostgreSQL Operator (apiserver, operator, scheduler..etc).                                             |
 | `pgo_image_tag`                   |             | Configures the image tag used when creating containers for the Crunchy PostgreSQL Operator (apiserver, operator, scheduler..etc)                                                 |
 | `pgo_operator_namespace`          |             | Set to configure the namespace where Operator will be deployed.                                                                                                                  |
-| `pgo_tls_no_verify`               |             | Set to configure Operator to verify TLS certificates.                                                                                                                            |
+| `pgo_tls_no_verify`               | false       | Set to configure Operator to verify TLS certificates.                                                                                                                            |
 | `pgo_disable_tls`                 | false       | Set to configure whether or not TLS should be enabled for the Crunchy PostgreSQL Operator apiserver.                                                                             |
 | `pgo_apiserver_port`              | 8443        | Set to configure the port used by the Crunchy PostgreSQL Operator apiserver.                                                                                                     |
 | `pgo_disable_eventing`            | false       | Set to configure whether or not eventing should be enabled for the Crunchy PostgreSQL Operator installation.                                                                     |
@@ -164,10 +164,10 @@ kubectl config current-context
 
 ### Minimal Variable Requirements
 
-The following variables should be configured at a minimum to deploy the Crunchy 
+The following variables should be configured at a minimum to deploy the Crunchy
 PostgreSQL Operator:
 
-* `kubernetes_context` 
+* `kubernetes_context`
 * `openshift_user`
 * `openshift_password`
 * `openshift_token`
@@ -185,7 +185,6 @@ PostgreSQL Operator:
 * `ccp_image_prefix`
 * `ccp_image_tag`
 * `pgo_client_version`
-* `pgo_tls_no_verify`
 * `auto_failover`
 * `backrest`
 * `badger`
@@ -193,8 +192,11 @@ PostgreSQL Operator:
 * `archive_mode`
 * `archive_timeout`
 * `auto_failover_sleep_secs`
+* `auto_failover_replace_replica`
 * `db_password_age_days`
 * `db_password_length`
+* `create_rbac`
+* `db_name`
 * `db_port`
 * `db_replicas`
 * `db_user`
@@ -204,19 +206,20 @@ PostgreSQL Operator:
 * `backup_storage`
 * `pgbadgerport`
 * `exporterport`
+* `scheduler_timeout`
 
 Additionally, `storage` variables will need to be defined to provide the Crunchy PGO with any required storage configuration.  Guidance for defining `storage` variables can be found in the next section.
 
 {{% notice tip %}}
-Users should remove or comment out the `kubernetes` or `openshift` variables if they're not being used 
+Users should remove or comment out the `kubernetes` or `openshift` variables if they're not being used
 from the inventory file.  Both sets of variables cannot be used at the same time.
 {{% /notice %}}
 
 ## Storage
 
-Kubernetes and OpenShift offer support for a wide variety of different storage types, and by default, the `inventory` is 
+Kubernetes and OpenShift offer support for a wide variety of different storage types, and by default, the `inventory` is
 pre-populated with storage configurations for some of these storage types.  However, the storage types defined
-in the `inventory` can be modified or removed as needed, while additional storage configurations can also be 
+in the `inventory` can be modified or removed as needed, while additional storage configurations can also be
 added to meet the specific storage requirements for your PG clusters.  
 
 The following `storage` variables are utilized to add or modify operator storage configurations in the `inventory`:
@@ -271,12 +274,12 @@ storage5_class='fast'
 storage5_fs_group=26
 ```
 
-To assign this storage definition to all `primary` pods created by the Operator, we 
+To assign this storage definition to all `primary` pods created by the Operator, we
 can configure the `primary_storage=storageos` variable in the inventory file.
 
 #### GKE
 
-The storage class provided by Google Kubernetes Environment (GKE) can be configured 
+The storage class provided by Google Kubernetes Environment (GKE) can be configured
 to be used by the Operator by setting the following variables in the `inventory` file:
 
 ```ini
@@ -288,30 +291,30 @@ storage8_class='standard'
 storage8_fs_group=26
 ```
 
-To assign this storage definition to all `primary` pods created by the Operator, we 
+To assign this storage definition to all `primary` pods created by the Operator, we
 can configure the `primary_storage=gce` variable in the inventory file.
 
 ### Considerations for Multi-Zone Cloud Environments
 
-When using the Operator in a Kubernetes cluster consisting of nodes that span 
-multiple zones, special consideration must betaken to ensure all pods and the 
+When using the Operator in a Kubernetes cluster consisting of nodes that span
+multiple zones, special consideration must betaken to ensure all pods and the
 volumes they require are scheduled and provisioned within the same zone.  Specifically,
-being that a pod is unable mount a volume that is located in another zone, any 
-volumes that are dynamically provisioned must be provisioned in a topology-aware 
-manner according to the specific scheduling requirements for the pod. For instance, 
-this means ensuring that the volume containing the database files for the primary 
-database in a new PostgreSQL cluster is provisioned in the same zone as the node 
+being that a pod is unable mount a volume that is located in another zone, any
+volumes that are dynamically provisioned must be provisioned in a topology-aware
+manner according to the specific scheduling requirements for the pod. For instance,
+this means ensuring that the volume containing the database files for the primary
+database in a new PostgreSQL cluster is provisioned in the same zone as the node
 containing the PostgreSQL primary pod that will be using it.
 
-For instructions on setting up storage classes for multi-zone environments, see 
+For instructions on setting up storage classes for multi-zone environments, see
 the [PostgreSQL Operator Documentation](/gettingstarted/design/designoverview/).
 
 ## Resource Configuration
 
-Kubernetes and OpenShift allow specific resource requirements to be specified for the various containers deployed inside of a pod. 
+Kubernetes and OpenShift allow specific resource requirements to be specified for the various containers deployed inside of a pod.
 This includes defining the required resources for each container, i.e. how much memory and CPU each container will need, while also
 allowing resource limits to be defined, i.e. the maximum amount of memory and CPU a container will be allowed to consume.
-In support of this capability, the Crunchy PGO allows any required resource configurations to be defined in the `inventory`, which 
+In support of this capability, the Crunchy PGO allows any required resource configurations to be defined in the `inventory`, which
 can the be utilized by the operator to set any desired resource requirements/limits for the various containers that will
 be deployed by the Crunchy PGO when creating and managing PG clusters.
 
@@ -352,13 +355,13 @@ With the configuration shown above, the `large` resource configuration would be 
 
 ## Understanding `pgo_operator_namespace` & `namespace`
 
-The Crunchy PostgreSQL Operator can be configured to be deployed and manage a single 
-namespace or manage several namespaces.  The following are examples of different types 
+The Crunchy PostgreSQL Operator can be configured to be deployed and manage a single
+namespace or manage several namespaces.  The following are examples of different types
 of deployment models configurable in the `inventory` file.
 
 ### Single Namespace
 
-To deploy the Crunchy PostgreSQL Operator to work with a single namespace (in this example 
+To deploy the Crunchy PostgreSQL Operator to work with a single namespace (in this example
 our namespace is named `pgo`), configure the following `inventory` settings:
 
 ```ini
@@ -379,12 +382,12 @@ namespace='pgouser1,pgouser2'
 ## Deploying Multiple Operators
 
 The 4.0 release of the Crunchy PostgreSQL Operator allows for multiple operator deployments in the same cluster.  
-To install the Crunchy PostgreSQL Operator to multiple namespaces, it's recommended to have an `inventory` file 
+To install the Crunchy PostgreSQL Operator to multiple namespaces, it's recommended to have an `inventory` file
 for each deployment of the operator.
 
 For each operator deployment the following inventory variables should be configured uniquely for each install.
 
-For example, operator could be deployed twice by changing the `pgo_operator_namespace` and `namespace` for those 
+For example, operator could be deployed twice by changing the `pgo_operator_namespace` and `namespace` for those
 deployments:
 
 Inventory A would deploy operator to the `pgo` namespace and it would manage the `pgo` target namespace.
@@ -404,22 +407,21 @@ namespace='pgo2,pgo3'
 ...
 ```
 
-Each install of the operator will create a corresponding directory in `$HOME/.pgo/<PGO NAMESPACE>` which will contain 
+Each install of the operator will create a corresponding directory in `$HOME/.pgo/<PGO NAMESPACE>` which will contain
 the TLS and `pgouser` client credentials.
 
 ## Deploying Grafana and Prometheus
 
 PostgreSQL clusters created by the operator can be configured to create additional containers for collecting metrics.  
-These metrics are very useful for understanding the overall health and performance of PostgreSQL database deployments 
+These metrics are very useful for understanding the overall health and performance of PostgreSQL database deployments
 over time.  The collectors included by the operator are:
 
-* Node Exporter - Host metrics where the PostgreSQL containers are running
 * PostgreSQL Exporter - PostgreSQL metrics
 
-The operator, however, does not install the necessary timeseries database (Prometheus) for storing the collected 
+The operator, however, does not install the necessary timeseries database (Prometheus) for storing the collected
 metrics or the front end visualization (Grafana) of those metrics.
 
-Included in these playbooks are roles for deploying Granfana and/or Prometheus.  See the `inventory` file 
+Included in these playbooks are roles for deploying Granfana and/or Prometheus.  See the `inventory` file
 for options to install the metrics stack.
 
 {{% notice tip %}}
